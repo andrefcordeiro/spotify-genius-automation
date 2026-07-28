@@ -8,13 +8,17 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from spotify_genius.platforms import get_current_song
-from spotify_genius.core import open_genius
+from spotify_genius.core import genius_window_closed, open_genius
 
 def run():
     print('Waiting for tracks...')
     previous = None
 
     while True:
+        if genius_window_closed():
+            print("Genius window closed. Exiting.")
+            return
+
         artist, title = get_current_song()
 
         if not artist or not title:

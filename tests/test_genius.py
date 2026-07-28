@@ -6,6 +6,7 @@ from spotify_genius.core.browser import (
     BrowserSpec,
     DedicatedBrowserOpener,
 )
+from spotify_genius import main
 from spotify_genius.core.browser.common import (
     _build_browser_args,
     _browser_from_env,
@@ -175,6 +176,78 @@ class DedicatedBrowserOpenerTests(unittest.TestCase):
         self.assertIn("--remote-debugging-port=9222", first_args)
         self.assertEqual(first_args[-1], "https://genius.com/first")
         open_chromium_tab.assert_called_once_with(9222, "https://genius.com/second")
+
+    @patch("spotify_genius.core.browser.opener.platform.system", return_value="Linux")
+    @patch(
+        "spotify_genius.core.browser.opener.linux.profile_dir",
+        return_value=Path("/tmp/spotify-genius-test-profile"),
+    )
+    @patch(
+        "spotify_genius.core.browser.opener.linux.select_browser",
+        return_value=BrowserSpec(("/usr/bin/google-chrome",), "chromium"),
+    )
+    @patch("spotify_genius.core.browser.opener._open_chromium_tab", return_value=False)
+    @patch("spotify_genius.core.browser.opener._find_available_port", side_effect=[9222, 9333])
+    @patch("spotify_genius.core.browser.opener.subprocess.Popen")
+    def test_linux_chromium_opener_restarts_dedicated_window_when_tab_attach_fails(
+        self,
+        popen,
+        _find_port,
+        open_chromium_tab,
+        _select_browser,
+        _profile_dir,
+        _system,
+    ):
+        opener = DedicatedBrowserOpener()
+
+        opener.open("https://genius.com/first")
+        opener.open("https://genius.com/second")
+
+        self.assertEqual(popen.call_count, 2)
+        first_args = popen.call_args_list[0].args[0]
+        second_args = popen.call_args_list[1].args[0]
+        self.assertIn("--new-window", first_args)
+        self.assertIn("--remote-debugging-port=9222", first_args)
+        self.assertEqual(first_args[-1], "https://genius.com/first")
+        self.assertIn("--new-window", second_args)
+        self.assertIn("--remote-debugging-port=9333", second_args)
+        self.assertEqual(second_args[-1], "https://genius.com/second")
+        open_chromium_tab.assert_called_once_with(9222, "https://genius.com/second")
+
+    @patch("spotify_genius.core.browser.opener._chromium_has_open_pages", return_value=False)
+    def test_chromium_window_is_closed_when_devtools_has_no_pages(self, has_open_pages):
+        opener = DedicatedBrowserOpener()
+        opener._window_started = True
+        opener._browser_kind = "chromium"
+        opener._remote_debugging_port = 9222
+
+        self.assertTrue(opener.window_closed())
+        has_open_pages.assert_called_once_with(9222)
+
+    @patch("spotify_genius.core.browser.opener._chromium_has_open_pages", return_value=True)
+    def test_chromium_window_is_not_closed_when_devtools_has_pages(self, has_open_pages):
+        opener = DedicatedBrowserOpener()
+        opener._window_started = True
+        opener._browser_kind = "chromium"
+        opener._remote_debugging_port = 9222
+
+        self.assertFalse(opener.window_closed())
+        has_open_pages.assert_called_once_with(9222)
+
+    @patch("spotify_genius.main.time.sleep")
+    @patch("spotify_genius.main.get_current_song", return_value=(None, None))
+    @patch("spotify_genius.main.genius_window_closed", side_effect=[False, True])
+    @patch("builtins.print")
+    def test_main_loop_exits_when_genius_window_is_closed(
+        self,
+        _print,
+        genius_window_closed,
+        _get_current_song,
+        _sleep,
+    ):
+        main.run()
+
+        self.assertEqual(genius_window_closed.call_count, 2)
 
     @patch("spotify_genius.core.browser.opener.platform.system", return_value="Linux")
     @patch(

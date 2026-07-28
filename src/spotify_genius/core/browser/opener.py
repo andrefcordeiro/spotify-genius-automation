@@ -5,6 +5,7 @@ import webbrowser
 from . import linux, windows
 from .common import (
     _build_browser_args,
+    _chromium_has_open_pages,
     _find_available_port,
     _open_chromium_tab,
 )
@@ -13,6 +14,8 @@ from .common import (
 class DedicatedBrowserOpener:
     def __init__(self):
         self._window_started = False
+        self._browser_kind: str | None = None
+        self._browser_process = None
         self._remote_debugging_port: int | None = None
 
     def open(self, url: str):
@@ -24,18 +27,29 @@ class DedicatedBrowserOpener:
 
         webbrowser.open(url)
 
+    def window_closed(self) -> bool:
+        if not self._window_started:
+            return False
+
+        if self._browser_kind == "chromium" and self._remote_debugging_port is not None:
+            return not _chromium_has_open_pages(self._remote_debugging_port)
+
+        return self._browser_process is not None and self._browser_process.poll() is not None
+
     def _open_platform(self, url: str, select_browser, profile_dir_for) -> bool:
         browser = select_browser()
         if browser is None:
             return False
 
-        if (
-            self._window_started
-            and browser.kind == "chromium"
-            and self._remote_debugging_port is not None
-            and _open_chromium_tab(self._remote_debugging_port, url)
-        ):
-            return True
+        if self._window_started and browser.kind == "chromium":
+            if (
+                self._remote_debugging_port is not None
+                and _open_chromium_tab(self._remote_debugging_port, url)
+            ):
+                return True
+
+            self._window_started = False
+            self._remote_debugging_port = None
 
         profile_dir = profile_dir_for(browser)
         profile_dir.mkdir(parents=True, exist_ok=True)
@@ -54,7 +68,7 @@ class DedicatedBrowserOpener:
         )
 
         try:
-            subprocess.Popen(
+            self._browser_process = subprocess.Popen(
                 args,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -63,11 +77,16 @@ class DedicatedBrowserOpener:
             return False
 
         self._window_started = True
+        self._browser_kind = browser.kind
         return True
 
 
 def open_url(url: str):
     _DEFAULT_OPENER.open(url)
+
+
+def window_closed() -> bool:
+    return _DEFAULT_OPENER.window_closed()
 
 
 _DEFAULT_OPENER = DedicatedBrowserOpener()

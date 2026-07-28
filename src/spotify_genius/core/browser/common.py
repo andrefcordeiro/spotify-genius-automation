@@ -1,3 +1,4 @@
+import json
 import os
 import platform
 import shlex
@@ -140,3 +141,16 @@ def _open_chromium_tab(remote_debugging_port: int, url: str) -> bool:
             return 200 <= response.status < 300
     except (OSError, URLError, TimeoutError):
         return False
+
+
+def _chromium_has_open_pages(remote_debugging_port: int) -> bool:
+    request = Request(f"http://127.0.0.1:{remote_debugging_port}/json/list")
+    try:
+        with urlopen(request, timeout=1) as response:
+            if not 200 <= response.status < 300:
+                return False
+            targets = json.load(response)
+    except (OSError, URLError, TimeoutError, json.JSONDecodeError):
+        return False
+
+    return any(target.get("type") == "page" for target in targets)

@@ -34,6 +34,12 @@ pip install .
 spotify-genius
 ```
 
+### Linux browser window behavior
+
+On Linux, Genius pages open in a dedicated browser profile so the first song opens a separate window and later songs open as tabs in that same window. This is supported for Chrome, Chromium, Brave, Edge, Vivaldi, and Firefox. If no supported browser is found, the app falls back to the system browser opener.
+
+You can choose the browser command with `SPOTIFY_GENIUS_BROWSER` and the profile directory with `SPOTIFY_GENIUS_BROWSER_PROFILE`.
+
 ## How to generate the windows .exe
 
 ### Requirements

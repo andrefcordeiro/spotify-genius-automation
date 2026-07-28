@@ -16,7 +16,7 @@ GENIUS_SEARCH_URL = "https://genius.com/api/search/song"
 GENIUS_SEARCH_PAGE_URL = "https://genius.com/search"
 GENIUS_HEADERS = {
     "Accept": "application/json",
-    "User-Agent": "spotify-genius/0.1.5",
+    "User-Agent": "spotify-genius/0.1.6",
     "X-Requested-With": "XMLHttpRequest",
 }
 VERSION_WORDS = (

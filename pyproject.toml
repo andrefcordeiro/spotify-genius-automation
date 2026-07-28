@@ -1,6 +1,6 @@
 [project]
 name = "spotify-genius"
-version = "0.1.5"
+version = "0.1.6"
 description = "Open Genius lyrics for the currently playing Spotify track"
 readme = { file = "README.md", content-type = "text/markdown" }
 authors = [{ name = "Andre Ferreira" }]

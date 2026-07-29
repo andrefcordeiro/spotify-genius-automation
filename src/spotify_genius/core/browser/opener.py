@@ -11,12 +11,17 @@ from .common import (
 )
 
 
+_CHROMIUM_CLOSED_CONFIRMATIONS = 3
+
+
 class DedicatedBrowserOpener:
     def __init__(self):
         self._window_started = False
         self._browser_kind: str | None = None
         self._browser_process = None
         self._remote_debugging_port: int | None = None
+        self._chromium_devtools_seen = False
+        self._chromium_absent_checks = 0
 
     def open(self, url: str):
         system = platform.system()
@@ -32,7 +37,17 @@ class DedicatedBrowserOpener:
             return False
 
         if self._browser_kind == "chromium" and self._remote_debugging_port is not None:
-            return not _chromium_has_open_pages(self._remote_debugging_port)
+            has_open_pages = _chromium_has_open_pages(self._remote_debugging_port)
+            if has_open_pages is True:
+                self._chromium_devtools_seen = True
+                self._chromium_absent_checks = 0
+                return False
+
+            if not self._chromium_devtools_seen:
+                return False
+
+            self._chromium_absent_checks += 1
+            return self._chromium_absent_checks >= _CHROMIUM_CLOSED_CONFIRMATIONS
 
         return self._browser_process is not None and self._browser_process.poll() is not None
 
@@ -46,10 +61,14 @@ class DedicatedBrowserOpener:
                 self._remote_debugging_port is not None
                 and _open_chromium_tab(self._remote_debugging_port, url)
             ):
+                self._chromium_devtools_seen = True
+                self._chromium_absent_checks = 0
                 return True
 
             self._window_started = False
             self._remote_debugging_port = None
+            self._chromium_devtools_seen = False
+            self._chromium_absent_checks = 0
 
         profile_dir = profile_dir_for(browser)
         profile_dir.mkdir(parents=True, exist_ok=True)
@@ -78,6 +97,9 @@ class DedicatedBrowserOpener:
 
         self._window_started = True
         self._browser_kind = browser.kind
+        if browser.kind == "chromium" and remote_debugging_port is not None:
+            self._chromium_devtools_seen = False
+            self._chromium_absent_checks = 0
         return True
 
 

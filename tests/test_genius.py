@@ -220,9 +220,12 @@ class DedicatedBrowserOpenerTests(unittest.TestCase):
         opener._window_started = True
         opener._browser_kind = "chromium"
         opener._remote_debugging_port = 9222
+        opener._chromium_devtools_seen = True
 
+        self.assertFalse(opener.window_closed())
+        self.assertFalse(opener.window_closed())
         self.assertTrue(opener.window_closed())
-        has_open_pages.assert_called_once_with(9222)
+        self.assertEqual(has_open_pages.call_count, 3)
 
     @patch("spotify_genius.core.browser.opener._chromium_has_open_pages", return_value=True)
     def test_chromium_window_is_not_closed_when_devtools_has_pages(self, has_open_pages):
@@ -233,6 +236,33 @@ class DedicatedBrowserOpenerTests(unittest.TestCase):
 
         self.assertFalse(opener.window_closed())
         has_open_pages.assert_called_once_with(9222)
+
+    @patch("spotify_genius.core.browser.opener._chromium_has_open_pages", return_value=None)
+    def test_chromium_window_is_not_closed_when_devtools_is_not_ready(self, has_open_pages):
+        opener = DedicatedBrowserOpener()
+        opener._window_started = True
+        opener._browser_kind = "chromium"
+        opener._remote_debugging_port = 9222
+
+        self.assertFalse(opener.window_closed())
+        self.assertFalse(opener.window_closed())
+        self.assertEqual(has_open_pages.call_count, 2)
+
+    @patch(
+        "spotify_genius.core.browser.opener._chromium_has_open_pages",
+        side_effect=[True, None, None, None],
+    )
+    def test_chromium_window_is_closed_after_devtools_disappears(self, has_open_pages):
+        opener = DedicatedBrowserOpener()
+        opener._window_started = True
+        opener._browser_kind = "chromium"
+        opener._remote_debugging_port = 9222
+
+        self.assertFalse(opener.window_closed())
+        self.assertFalse(opener.window_closed())
+        self.assertFalse(opener.window_closed())
+        self.assertTrue(opener.window_closed())
+        self.assertEqual(has_open_pages.call_count, 4)
 
     @patch("spotify_genius.main.time.sleep")
     @patch("spotify_genius.main.get_current_song", return_value=(None, None))

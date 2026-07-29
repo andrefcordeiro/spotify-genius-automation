@@ -143,14 +143,14 @@ def _open_chromium_tab(remote_debugging_port: int, url: str) -> bool:
         return False
 
 
-def _chromium_has_open_pages(remote_debugging_port: int) -> bool:
+def _chromium_has_open_pages(remote_debugging_port: int) -> bool | None:
     request = Request(f"http://127.0.0.1:{remote_debugging_port}/json/list")
     try:
         with urlopen(request, timeout=1) as response:
             if not 200 <= response.status < 300:
-                return False
+                return None
             targets = json.load(response)
     except (OSError, URLError, TimeoutError, json.JSONDecodeError):
-        return False
+        return None
 
     return any(target.get("type") == "page" for target in targets)
